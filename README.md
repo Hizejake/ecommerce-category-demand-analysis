@@ -1,25 +1,42 @@
 # E-Commerce Category and Demand Analysis
 
+## Dataset
+This project uses the public **Brazilian E-Commerce Public Dataset by Olist**: approximately 100,000 real, anonymized orders from 2016–2018 across multiple Brazilian marketplaces.
+
+- Source: [Olist public dataset mirror](https://github.com/infobarbosa/dataset-olist)
+- License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+- Attribution: Olist, *Brazilian E-Commerce Public Dataset by Olist*, Kaggle
+
 ## Executive summary
-- **Top revenue category:** Women Western — ₹3,959,241
-- **Average conversion:** 4.60%
-- **Average repeat-purchase rate:** 27.50%
-- **Average discount:** 18.44%
+- **Top category by delivered GMV:** health_beauty — R$1,233,131.72
+- **Delivered orders analyzed:** 96,478
+- **Product items analyzed:** 110,197
+- **Estimated repeat-customer share:** 3.00%
 
 ## Category summary
-| category      |   revenue |   margin |   orders |   conversion_pct |   repeat_rate_pct |   discount_pct |   margin_pct |     aov |
-|:--------------|----------:|---------:|---------:|-----------------:|------------------:|---------------:|-------------:|--------:|
-| Women Western |   3959241 |   924111 |     1968 |             4.77 |             27.02 |          20.09 |        23.34 | 2011.81 |
-| Men Casual    |   3092062 |   713472 |     1684 |             4.79 |             25.93 |          21.11 |        23.07 | 1836.14 |
-| Sportswear    |   2820738 |   732054 |     1494 |             4.85 |             25.30 |          16.10 |        25.95 | 1888.04 |
-| Beauty        |   2475923 |   628366 |     1307 |             4.13 |             30.78 |          17.84 |        25.38 | 1894.36 |
-| Kids          |   2174472 |   536566 |     1131 |             4.44 |             28.48 |          17.04 |        24.68 | 1922.61 |
+| category              |   gross_merchandise_value |   freight_value |   order_count |   item_count |    aov |
+|:----------------------|--------------------------:|----------------:|--------------:|-------------:|-------:|
+| health_beauty         |                1233131.72 |       178957.81 |          8647 |         9465 | 142.61 |
+| watches_gifts         |                1166176.98 |        98156.14 |          5495 |         5859 | 212.23 |
+| bed_bath_table        |                1023434.76 |       201774.50 |          9272 |        10953 | 110.38 |
+| sports_leisure        |                 954852.55 |       163404.36 |          7530 |         8431 | 126.81 |
+| computers_accessories |                 888724.61 |       143999.16 |          6530 |         7644 | 136.10 |
+| furniture_decor       |                 711927.69 |       168402.23 |          6307 |         8160 | 112.88 |
+| housewares            |                 615628.69 |       142763.56 |          5743 |         6795 | 107.20 |
+| cool_stuff            |                 610204.10 |        81476.79 |          3559 |         3718 | 171.45 |
+| auto                  |                 578966.65 |        90488.10 |          3810 |         4140 | 151.96 |
+| toys                  |                 471286.48 |        75774.58 |          3804 |         4030 | 123.89 |
+| garden_tools          |                 470495.28 |        96650.40 |          3448 |         4268 | 136.45 |
+| baby                  |                 400421.84 |        66305.81 |          2809 |         2982 | 142.55 |
+| perfumery             |                 390144.65 |        53026.98 |          3086 |         3340 | 126.42 |
+| telephony             |                 309860.23 |        69342.39 |          4093 |         4430 |  75.70 |
+| office_furniture      |                 268154.31 |        67057.05 |          1254 |         1668 | 213.84 |
 
 ## Recommendations
-1. Protect availability and assortment depth for top-revenue categories.
-2. Test lower-discount, higher-margin bundles in categories with strong repeat rates.
-3. Improve paid and organic discovery for categories with lower conversion.
-4. Track revenue, margin, conversion, repeat rate, and inventory health together.
+1. Protect assortment depth and stock availability for high-GMV categories.
+2. Monitor freight cost alongside GMV so category growth does not weaken delivery economics.
+3. Focus retention campaigns on categories with a high repeat-customer share.
+4. Track monthly GMV, order count, average order value, and freight as a category dashboard.
 
 ## Method
-Synthetic monthly category data is used for a reproducible Myntra-style business analysis. KPI summaries and charts are generated with Python, Pandas, and Matplotlib.
+The analysis joins delivered orders, order items, products, category translations, and customers. It calculates category GMV, order counts, item counts, average order value, monthly demand, and repeat-customer share. No synthetic observations are used.

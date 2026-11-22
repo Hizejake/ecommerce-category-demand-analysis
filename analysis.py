@@ -3,82 +3,89 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parent
-DATA = OUT / "data" / "category_sales.csv"
-
-
-def generate_data():
-    import numpy as np
-    DATA.parent.mkdir(parents=True, exist_ok=True)
-    rng = np.random.default_rng(42)
-    rows = []
-    categories = ["Women Western", "Men Casual", "Kids", "Beauty", "Sportswear"]
-    for month in range(1, 13):
-        for category in categories:
-            base = {"Women Western": 160, "Men Casual": 145, "Kids": 95, "Beauty": 110, "Sportswear": 125}[category]
-            seasonality = 1 + 0.12 * np.sin((month - 1) / 12 * 2 * np.pi)
-            orders = int(base * seasonality * rng.uniform(0.90, 1.10))
-            aov = rng.uniform(1450, 2400)
-            revenue = orders * aov
-            margin_rate = rng.uniform(0.18, 0.32)
-            conversion = rng.uniform(0.025, 0.065)
-            repeat_rate = rng.uniform(0.18, 0.38)
-            discount = rng.uniform(0.08, 0.28)
-            rows.append([month, category, orders, round(revenue), round(revenue * margin_rate), round(conversion * 100, 2), round(repeat_rate * 100, 2), round(discount * 100, 2), round(aov, 2)])
-    pd.DataFrame(rows, columns=["month", "category", "orders", "revenue", "margin", "conversion_pct", "repeat_rate_pct", "discount_pct", "aov"]).to_csv(DATA, index=False)
+DATA = OUT / "data"
 
 
 def main():
-    if not DATA.exists():
-        generate_data()
-    df = pd.read_csv(DATA)
+    orders = pd.read_csv(DATA / "olist_orders_dataset.csv.gz")
+    items = pd.read_csv(DATA / "olist_order_items_dataset.csv.gz")
+    products = pd.read_csv(DATA / "olist_products_dataset.csv.gz")
+    translations = pd.read_csv(DATA / "product_category_name_translation.csv.gz")
+    customers = pd.read_csv(DATA / "olist_customers_dataset.csv.gz")
 
-    summary = df.groupby("category", as_index=False).agg(
-        revenue=("revenue", "sum"), margin=("margin", "sum"),
-        orders=("orders", "sum"), conversion_pct=("conversion_pct", "mean"),
-        repeat_rate_pct=("repeat_rate_pct", "mean"), discount_pct=("discount_pct", "mean")
+    delivered = orders.loc[orders["order_status"] == "delivered"].copy()
+    delivered["order_purchase_timestamp"] = pd.to_datetime(delivered["order_purchase_timestamp"])
+    delivered["month"] = delivered["order_purchase_timestamp"].dt.to_period("M").astype(str)
+
+    category = (items.merge(products[["product_id", "product_category_name"]], on="product_id", how="left")
+                     .merge(translations, on="product_category_name", how="left")
+                     .rename(columns={"product_category_name_english": "category"}))
+    category["category"] = category["category"].fillna("unknown")
+
+    fact = (delivered.merge(category, on="order_id", how="inner")
+                     .merge(customers[["customer_id", "customer_unique_id"]], on="customer_id", how="left"))
+
+    summary = fact.groupby("category", as_index=False).agg(
+        gross_merchandise_value=("price", "sum"),
+        freight_value=("freight_value", "sum"),
+        order_count=("order_id", "nunique"),
+        item_count=("order_item_id", "count")
     )
-    summary["margin_pct"] = summary["margin"] / summary["revenue"] * 100
-    summary["aov"] = summary["revenue"] / summary["orders"]
-    summary = summary.sort_values("revenue", ascending=False)
+    summary["aov"] = summary["gross_merchandise_value"] / summary["order_count"]
+    summary = summary.sort_values("gross_merchandise_value", ascending=False).head(15)
     summary.to_csv(OUT / "category_summary.csv", index=False)
 
-    ax = summary.plot(x="category", y="revenue", kind="bar", figsize=(9, 5), legend=False, color="#4285F4")
-    ax.set_title("Annual Revenue by Category")
+    ax = summary.plot(x="category", y="gross_merchandise_value", kind="bar", figsize=(11, 6), legend=False, color="#4285F4")
+    ax.set_title("Olist Delivered-Order GMV by Product Category")
     ax.set_xlabel("Category")
-    ax.set_ylabel("Revenue")
-    plt.xticks(rotation=20, ha="right")
+    ax.set_ylabel("Gross merchandise value (BRL)")
+    plt.xticks(rotation=35, ha="right")
     plt.tight_layout()
-    plt.savefig(OUT / "revenue_by_category.png", dpi=180)
+    plt.savefig(OUT / "gmv_by_category.png", dpi=180)
     plt.close()
 
-    ax = df.groupby("month")["revenue"].sum().plot(marker="o", figsize=(9, 5), color="#0F9D58")
-    ax.set_title("Monthly Revenue Trend")
+    monthly = fact.groupby("month", as_index=False).agg(gmv=("price", "sum"), orders=("order_id", "nunique"))
+    monthly.to_csv(OUT / "monthly_demand.csv", index=False)
+    ax = monthly.plot(x="month", y="gmv", marker="o", figsize=(11, 5), legend=False, color="#0F9D58")
+    ax.set_title("Monthly Delivered-Order GMV")
     ax.set_xlabel("Month")
-    ax.set_ylabel("Revenue")
+    ax.set_ylabel("GMV (BRL)")
+    plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
-    plt.savefig(OUT / "monthly_revenue_trend.png", dpi=180)
+    plt.savefig(OUT / "monthly_gmv_trend.png", dpi=180)
     plt.close()
 
+    repeat_customer_orders = (fact.groupby("customer_unique_id")["order_id"].nunique()
+                                  .gt(1).sum())
+    repeat_rate = repeat_customer_orders / fact["customer_unique_id"].nunique() * 100
     leader = summary.iloc[0]
+
     report = f"""# E-Commerce Category and Demand Analysis
 
+## Dataset
+This project uses the public **Brazilian E-Commerce Public Dataset by Olist**: approximately 100,000 real, anonymized orders from 2016–2018 across multiple Brazilian marketplaces.
+
+- Source: [Olist public dataset mirror](https://github.com/infobarbosa/dataset-olist)
+- License: [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+- Attribution: Olist, *Brazilian E-Commerce Public Dataset by Olist*, Kaggle
+
 ## Executive summary
-- **Top revenue category:** {leader['category']} — ₹{leader['revenue']:,.0f}
-- **Average conversion:** {df['conversion_pct'].mean():.2f}%
-- **Average repeat-purchase rate:** {df['repeat_rate_pct'].mean():.2f}%
-- **Average discount:** {df['discount_pct'].mean():.2f}%
+- **Top category by delivered GMV:** {leader['category']} — R${leader['gross_merchandise_value']:,.2f}
+- **Delivered orders analyzed:** {fact['order_id'].nunique():,.0f}
+- **Product items analyzed:** {len(fact):,.0f}
+- **Estimated repeat-customer share:** {repeat_rate:.2f}%
 
 ## Category summary
 {summary.to_markdown(index=False, floatfmt='.2f')}
 
 ## Recommendations
-1. Protect availability and assortment depth for top-revenue categories.
-2. Test lower-discount, higher-margin bundles in categories with strong repeat rates.
-3. Improve paid and organic discovery for categories with lower conversion.
-4. Track revenue, margin, conversion, repeat rate, and inventory health together.
+1. Protect assortment depth and stock availability for high-GMV categories.
+2. Monitor freight cost alongside GMV so category growth does not weaken delivery economics.
+3. Focus retention campaigns on categories with a high repeat-customer share.
+4. Track monthly GMV, order count, average order value, and freight as a category dashboard.
 
 ## Method
-Synthetic monthly category data is used for a reproducible Myntra-style business analysis. KPI summaries and charts are generated with Python, Pandas, and Matplotlib.
+The analysis joins delivered orders, order items, products, category translations, and customers. It calculates category GMV, order counts, item counts, average order value, monthly demand, and repeat-customer share. No synthetic observations are used.
 """
     (OUT / "README.md").write_text(report, encoding="utf-8")
 
